@@ -66,8 +66,14 @@ int main(int ac, char* av[]) {
 
                 ws_session->run("test.deribit.com", "443", auth_message.c_str(), "/ws/api/v2");
             }else if(input_line.substr(0,15) == "deribit --place"){
-                //deribit --place direction=buy instrument=BTC-USD type=limit amount=0.5 price=50000
+                //deribit --place direction=<> instrument_name=<> type=<> 
+                //deribit --place direction=buy instrument_name=ETH-PERPETUAL type=market amount=40 label=market0000234
                 if (ws_session && !ws_session->get_access_token().empty()) {
+
+                    if (input_line.size() <= 17) {
+                        std::cout << "Error: No parameters provided. Expected parameters in the format key=value.\n";
+                        continue;
+                    }
                     std::string param_string = input_line.substr(16);
 
                     std::unordered_map<std::string, std::string> params;
@@ -84,7 +90,7 @@ int main(int ac, char* av[]) {
                             params[key] = value;
                         } else {
                             std::cerr << "Error: Malformed parameter '" << token << "'. Expected format is key=value.\n";
-                            return 1;
+                            continue;
                         }
                     }
 
@@ -94,105 +100,180 @@ int main(int ac, char* av[]) {
                         std::cout << "Error: 'direction' is a mandatory parameter.\n";
                         continue;
                     }
-                    j["method"] = "private/" + params["direction"];
-                    j["params"] = json::object();
-                    if (params.find("instrument") == params.end()) {
-                        std::cout << "Error: 'instrument' is a mandatory parameter.\n";
+
+                    if (params.find("instrument_name") == params.end()) {
+                        std::cout << "Error: 'instrument_name' is a mandatory parameter.\n";
                         continue;
                     }
-                    
-                    j["params"].push_back({"instrument", params["instrument"]});
 
                     if (params.find("type") == params.end()) {
-                        std::cout << "Error: 'type' is a mandatory parameter.\n";
-                        continue;
+                        //limit order by default
+                        params["type"]="limit";
                     }
+
+                    j["method"] = "private/" + params["direction"];
+                    j["params"] = json::object();
+                    j["params"].push_back({"instrument_name", params["instrument_name"]});
+                    j["params"].push_back({"type", params["type"]});
 
                     // Additional validations based on type
                     std::string type = params["type"];
-
-                    if (type == "market" || type == "stop_market" || type == "take_market") {
-                        if (params.find("amount") == params.end() || params.find("contracts") == params.end()) {
-                            std::cout << "Error: Either 'amount' or 'contracts' is required for market orders.\n";
-                            continue;
-                        }
-                    } else if (type == "limit" || type == "stop_limit" || type == "take_limit" || type == "market_limit") {
+                    auto validate_amount_contracts = [&]() -> bool {
                         if (params.find("amount") == params.end() && params.find("contracts") == params.end()) {
-                            std::cout << "Error: Either 'amount' or 'contracts' is required for limit orders.\n";
-                            continue;
+                            std::cerr << "Error: Either 'amount' or 'contracts' is required for " << type << " order.\n";
+                            return false;
                         }
+                        if (params.find("amount") != params.end() && params.find("contracts") != params.end() && params["amount"] != params["contracts"]) {
+                            std::cerr << "Error: If both 'contracts' and 'amount' are passed, they must match each other.\n";
+                            return false;
+                        }
+                        if (params.find("amount") != params.end()) {
+                            j["params"].push_back({"amount", std::stod(params["amount"])});
+                        }
+                        if (params.find("contracts") != params.end()) {
+                            j["params"].push_back({"contracts", std::stod(params["contracts"])});
+                        }
+                        return true;
+                    };
+
+                    if (type == "limit" || type == "stop_limit") {
+                        if (!validate_amount_contracts()) continue;
+
                         if (params.find("price") == params.end()) {
-                            std::cout << "Error: 'price' is required for limit orders.\n";
+                            std::cerr << "Error: 'price' is required for " << type << " order.\n";
                             continue;
                         }
-                    } else if (type == "trailing_stop") {
-                        if (params.find("trigger_offset") == params.end()) {
-                            std::cout << "Error: 'trigger_offset' is required for trailing stop orders.\n";
+                        j["params"].push_back({"price", std::stod(params["price"])});
+
+                        if (type == "stop_limit") {
+                            if (params.find("trigger_price") == params.end()) {
+                                std::cerr << "Error: 'trigger_price' is required for stop_limit order.\n";
+                                continue;
+                            }
+                            j["params"].push_back({"trigger_price", std::stod(params["trigger_price"])});
+
+                            if (params.find("trigger") == params.end()) {
+                                std::cerr << "Error: 'trigger' is required for stop_limit order.\n";
+                                continue;
+                            }
+                            j["params"].push_back({"trigger", params["trigger"]});
+                        }
+                    } else if (type == "market" || type == "stop_market") {
+                        if (!validate_amount_contracts()) continue;
+
+                        if (type == "stop_market" && params.find("trigger_price") == params.end()) {
+                            std::cerr << "Error: 'trigger_price' is required for stop_market order.\n";
                             continue;
                         }
-                    } else if (type == "stop_market" || type == "stop_limit") {
-                        if (params.find("trigger_price") == params.end()) {
-                            std::cout << "Error: 'trigger_price' is required for stop orders.\n";
-                            continue;
+                        if (params.find("trigger_price") != params.end()) {
+                            j["params"].push_back({"trigger_price", std::stod(params["trigger_price"])});
                         }
+                    } else {
+                        std::cerr << "Error: Unsupported order type '" << type << "'.\n";
+                        continue;
                     }
 
                      // Validate numerical values if present
                     try {
-                        if (params.find("amount") != params.end()) {
-                            double amount = std::stod(params["amount"]);
-                            if (amount <= 0) {
-                                throw std::invalid_argument("Amount must be positive.");
+                        auto validate_positive_number = [&](const std::string &key) {
+                            if (params.find(key) != params.end()) {
+                                double value = std::stod(params[key]);
+                                if (value <= 0) {
+                                    throw std::invalid_argument(key + " must be positive.");
+                                }
                             }
-                        }
+                        };
 
-                        if (params.find("contracts") != params.end()) {
-                            double contracts = std::stod(params["contracts"]);
-                            if (contracts <= 0) {
-                                throw std::invalid_argument("Contracts must be positive.");
+                        auto validate_boolean = [&](const std::string &key) {
+                            if (params.find(key) != params.end()) {
+                                std::string value = params[key];
+                                if (value != "true" && value != "false") {
+                                    throw std::invalid_argument(key + " must be a boolean ('true' or 'false').");
+                                }
                             }
-                        }
+                        };
 
-                        if (params.find("price") != params.end()) {
-                            double price = std::stod(params["price"]);
-                            if (price <= 0) {
-                                throw std::invalid_argument("Price must be positive.");
+                        auto validate_enum = [&](const std::string &key, const std::set<std::string> &valid_values) {
+                            if (params.find(key) != params.end()) {
+                                if (valid_values.find(params[key]) == valid_values.end()) {
+                                    throw std::invalid_argument(key + " has an invalid value.");
+                                }
                             }
-                        }
+                        };
 
-                        if (params.find("trigger_price") != params.end()) {
-                            double trigger_price = std::stod(params["trigger_price"]);
-                            if (trigger_price <= 0) {
-                                throw std::invalid_argument("Trigger price must be positive.");
-                            }
-                        }
+                        validate_positive_number("amount");
+                        validate_positive_number("contracts");
+                        validate_positive_number("price");
+                        validate_positive_number("trigger_price");
+                        validate_positive_number("trigger_offset");
+                        validate_boolean("post_only");
+                        validate_boolean("reject_post_only");
+                        validate_boolean("reduce_only");
+                        validate_boolean("mmp");
+                        validate_enum("time_in_force", {"good_til_cancelled", "good_til_day", "fill_or_kill", "immediate_or_cancel"});
+                        validate_enum("trigger", {"index_price", "mark_price", "last_price"});
+                        validate_enum("linked_order_type", {"one_triggers_other", "one_cancels_other", "one_triggers_one_cancels_other"});
 
-                        if (params.find("trigger_offset") != params.end()) {
-                            double trigger_offset = std::stod(params["trigger_offset"]);
-                            if (trigger_offset <= 0) {
-                                throw std::invalid_argument("Trigger offset must be positive.");
-                            }
+                        if (params.find("label") != params.end() && params["label"].size() > 64) {
+                            throw std::invalid_argument("label must not exceed 64 characters.");
                         }
                     } catch (const std::invalid_argument &e) {
-                        std::cout << "Error: " << e.what() << "\n";
+                        std::cerr << "Error: " << e.what() << "\n";
                         continue;
                     }
 
-                    for (const auto& [key, value] : params) {
-                        std::cout << key << ": " << value << "\n";
+                    // Add optional parameters based on type
+                    if (type == "limit" || type == "stop_limit") {
+                        if (params.find("post_only") != params.end()) {
+                            j["params"].push_back({"post_only", params["post_only"] == "true"});
+                        }
+                        if (params.find("reject_post_only") != params.end() && params["post_only"] == "true") {
+                            j["params"].push_back({"reject_post_only", params["reject_post_only"] == "true"});
+                        }
+                        if (params.find("mmp") != params.end()) {
+                            j["params"].push_back({"mmp", params["mmp"] == "true"});
+                        }
                     }
-                    // jsonrpc j;
-                    // j["method"] = "private/" + params["direction"];
-                    // j["params"] = {
-                    //     {"instrument_name", ""},
-                    //     {"amount", 40},
-                    //     {"type", "market"},
-                    //     {"label", "market0000234"}
-                    // };
 
-                    // std::string message = j.dump();
-                    // ws_session->send_message(message); // Send the message
-                    // std::cout << "Placed order request sent.\n";
+                    if (params.find("reduce_only") != params.end()) {
+                        j["params"].push_back({"reduce_only", params["reduce_only"] == "true"});
+                    }
+
+                    if (params.find("time_in_force") != params.end()) {
+                        j["params"].push_back({"time_in_force", params["time_in_force"]});
+                    }
+
+                    if (type == "stop_limit" || type == "stop_market") {
+                        if (params.find("trigger") != params.end()) {
+                            j["params"].push_back({"trigger", params["trigger"]});
+                        }
+                        if (params.find("trigger_price") != params.end()) {
+                            j["params"].push_back({"trigger_price", std::stod(params["trigger_price"])});
+                        }
+                    }
+
+                    // Add universal optional parameters
+                    if (params.find("label") != params.end()) {
+                        j["params"].push_back({"label", params["label"]});
+                    }
+                    if (params.find("max_show") != params.end()) {
+                        j["params"].push_back({"max_show", std::stod(params["max_show"])});
+                    }
+                    if (params.find("valid_until") != params.end()) {
+                        j["params"].push_back({"valid_until", std::stol(params["valid_until"])});
+                    }
+                    if (params.find("trigger_offset") != params.end()) {
+                        j["params"].push_back({"trigger_offset", std::stod(params["trigger_offset"])});
+                    }
+
+                    // for (const auto& [key, value] : params) {
+                    //     std::cout << key << ": " << value << "\n";
+                    // }
+
+                    std::string message = j.dump();
+                    std::cout << message << "\n\n";
+                    ws_session->send_message(message); // Send the message
+                    std::cout << "Placed order request sent.\n";
                 } else {
                     std::cout << "Error: Access token not set. Please authenticate first.\n";
                 }
@@ -201,7 +282,7 @@ int main(int ac, char* av[]) {
             }
             //add subscribe and unsubscribe (symbols handling)
             //view current positions
-            //continuous orderbook updates for subscribed symbols 
+            //continuous orderbook updates for subscribed symbols
             //get order book
             else if (input_line == "exit"){
                 if (ws_session) {
