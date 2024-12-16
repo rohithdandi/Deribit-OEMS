@@ -1,19 +1,48 @@
 #include <olc_net.h>
 
+void print_subscribed_symbols_to_file(std::shared_ptr<session> ws_session, std::atomic<bool>& show_subscriptions) {
+    std::ofstream outfile("./subscribed_symbols.txt");
+    
+    if (!outfile.is_open()) {
+        std::cerr << "Error opening file to write subscribed symbols.\n";
+        return;
+    }
+
+    std::cout << "File opened successfully.\n";
+
+    while (show_subscriptions.load()) {
+        auto symbols = ws_session->get_subscribed_symbols();
+        
+        outfile.clear(); // Clear any previous contents in the file
+
+        // Print the symbols to the file
+        for (const auto& entry : symbols) {
+            outfile << "Symbol: " << entry.first << ", Price: " << entry.second << "\n";
+        }
+
+        outfile.flush(); // Ensure the content is written to disk
+        std::this_thread::sleep_for(std::chrono::seconds(1)); // Adjust the sleep time as needed
+    }
+
+    outfile.close();
+    std::cout << "File closed.\n";  // Debugging
+}
+
 int main(int ac, char* av[]) {
-    bool running = true;
+    std::atomic<bool> running(true);
+    std::atomic<bool> show_subscriptions(false);
     std::cout << "Welcome to the interactive CLI program! Type '--help' for options.\n";
 
     // The io_context is required for all I/O
     net::io_context ioc;
-    const int ioc_threads = 1;
+    const int ioc_threads = 2;
     std::vector<std::thread> ioc_thread_pool;
 
     // for signal handler to exit cleanly
     boost::asio::signal_set signals(ioc, SIGINT, SIGTERM);
     signals.async_wait([&](auto, auto){
         ioc.stop();
-        running=false;
+        running.store(false, std::memory_order_release);
         std::cout << "Signal received, stopped the process.";
     });
 
@@ -68,9 +97,10 @@ int main(int ac, char* av[]) {
             }else if(input_line.substr(0,15) == "deribit --place"){
                 //deribit --place direction=<> instrument_name=<> type=<> 
                 //deribit --place direction=buy instrument_name=ETH-PERPETUAL type=market amount=40 label=market0000234
+                //deribit --place direction=sell instrument_name=ETH-PERPETUAL type=stop_limit amount=10 price=145.6 trigger_price=145 trigger=last_price
                 if (ws_session && !ws_session->get_access_token().empty()) {
 
-                    if (input_line.size() <= 17) {
+                    if (input_line.size() <= 16) {
                         std::cout << "Error: No parameters provided. Expected parameters in the format key=value.\n";
                         continue;
                     }
@@ -277,13 +307,144 @@ int main(int ac, char* av[]) {
                 } else {
                     std::cout << "Error: Access token not set. Please authenticate first.\n";
                 }
-            }else if(input_line == "deribit --cancel"){
+            }else if(input_line.substr(0,15) == "deribit --cancel"){
                 //by order id.
+            }else if(input_line.substr(0,24) == "deribit --get_order_book"){
+                //deribit --get_order_book instrument_name=BTC-PERPETUAL depth=5
+                if(!ws_session || ws_session->get_access_token().empty()){
+                    std::cout << "Error: Access token not set. Please authenticate first.\n";
+                    continue;
+                }
+                
+                if (input_line.size() <= 25){
+                    std::cout << "Error: No parameters provided. Expected parameters in the format key=value.\n";
+                    continue;
+                }
+                std::string param_string = input_line.substr(25);
+
+                std::unordered_map<std::string, std::string> params;
+
+                // Parse the parameters
+                std::istringstream iss(param_string);
+                std::string token;
+                while (std::getline(iss, token, ' ')) {
+                    size_t eq_pos = token.find('=');
+                    
+                    if (eq_pos != std::string::npos && eq_pos < token.size() - 1) {  // Ensure '=' exists and there's a value
+                        std::string key = token.substr(0,eq_pos);
+                        std::string value = token.substr(eq_pos + 1);
+                        params[key] = value;
+                    } else {
+                        std::cerr << "Error: Malformed parameter '" << token << "'. Expected format is key=value.\n";
+                        continue;
+                    }
+                }
+
+                jsonrpc j;
+
+                if (params.find("instrument_name") == params.end()) {
+                    std::cout << "Error: 'instrument_name' is a mandatory parameter.\n";
+                    continue;
+                }
+                if (params.find("depth") == params.end()) {
+                    std::cout << "Error: 'depth' is a mandatory parameter.\n";
+                    continue;
+                }
+
+                
+                auto validate_enum = [&](const std::string &key, const std::set<std::string> &valid_values) {
+                    if (params.find(key) != params.end()) {
+                        if (valid_values.find(params[key]) == valid_values.end()) {
+                            throw std::invalid_argument(key + " has an invalid value.");
+                        }
+                    }
+                };
+                try{
+                    validate_enum("depth", {"1", "5", "10","20","50","100","1000","10000"});
+                }catch(const std::invalid_argument &e){
+                    std::cerr << "Error: " << e.what() << "\n";
+                    continue;
+                }
+                j["method"] = "public/get_order_book";
+                j["params"] = {
+                    {"instrument_name", params["instrument_name"]},
+                    {"depth", std::stod(params["depth"])},
+                };
+
+                std::string message = j.dump();
+                std::cout << message << "\n\n";
+                ws_session->send_message(message); // Send the message
+                std::cout << "Placed get order book request sent.\n";
+            }else if(input_line.substr(0,19) == "deribit --subscribe"){
+                //deribit --subscribe channel=deribit_price_index instrument_name=btc_usd
+                if(!ws_session || ws_session->get_access_token().empty()){
+                    std::cout << "Error: Access token not set. Please authenticate first.\n";
+                    continue;
+                }
+
+                std::string param_string = input_line.substr(20);
+
+                std::unordered_map<std::string, std::string> params;
+
+                // Parse the parameters
+                std::istringstream iss(param_string);
+                std::string token;
+                while (std::getline(iss, token, ' ')) {
+                    size_t eq_pos = token.find('=');
+                    
+                    if (eq_pos != std::string::npos && eq_pos < token.size() - 1) {  // Ensure '=' exists and there's a value
+                        std::string key = token.substr(0,eq_pos);
+                        std::string value = token.substr(eq_pos + 1);
+                        params[key] = value;
+                    } else {
+                        std::cerr << "Error: Malformed parameter '" << token << "'. Expected format is key=value.\n";
+                        continue;
+                    }
+                }
+
+                jsonrpc j;
+
+                if (params.find("instrument_name") == params.end()) {
+                    std::cout << "Error: 'instrument_name' is a mandatory parameter.\n";
+                    continue;
+                }
+                if (params.find("channel") == params.end()) {
+                    std::cout << "Error: 'channel' is a mandatory parameter.\n";
+                    continue;
+                }
+
+                //not validating channel and instrument_name here.
+
+                j["method"]="private/subscribe";
+                j["params"] = {
+
+                    {"channels", {params["channel"]+"."+params["instrument_name"]}},
+                };
+                
+                std::string message = j.dump();
+                std::cout << message << "\n\n";
+                ws_session->send_message(message); // Send the message
+                std::cout << "Placed subscribe request sent.\n";
+            }else if(input_line == "deribit --unsubscribe_all"){
+                if(!ws_session || ws_session->get_access_token().empty()){
+                    std::cout << "Error: Access token not set. Please authenticate first.\n";
+                    continue;
+                }
+                jsonrpc j("private/unsubscribe_all");
+                std::string message = j.dump();
+                ws_session->send_message(message); // Send the message
+                std::cout << "Placed unsubscribe all request sent.\n";
+            }else if (input_line == "deribit --show_subscribed") {
+                show_subscriptions.store(true);
+                // Launch a background thread to print the subscribed symbols to a file
+                std::thread subscription_thread(print_subscribed_symbols_to_file, ws_session, std::ref(show_subscriptions));
+                subscription_thread.detach(); // Detach the thread to run independently
+                std::cout << "Displaying subscribed symbols. Type 'deribit --stop_showing_subscribed' to stop.\n";
             }
-            //add subscribe and unsubscribe (symbols handling)
-            //view current positions
-            //continuous orderbook updates for subscribed symbols
-            //get order book
+            else if (input_line == "deribit --stop_showing_subscribed") {
+                show_subscriptions.store(false);
+                std::cout << "Stopped displaying subscribed symbols.\n";
+            }
             else if (input_line == "exit"){
                 if (ws_session) {
                     ws_session->close_websocket();
@@ -291,7 +452,7 @@ int main(int ac, char* av[]) {
                 }
 
                 std::cout << "Exiting the program...\n";
-                running = false;
+                running.store(false, std::memory_order_release);
                 ioc.stop();
             }else {
                 std::cout << "Unknown command. Type '--help' for options.\n";

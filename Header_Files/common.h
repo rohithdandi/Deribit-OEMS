@@ -6,11 +6,13 @@
 #include <deque>
 #include <string>
 #include <optional>
+#include <unordered_map>
 #include <vector>
 #include <iostream>
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <fstream>
 
 #include <boost/beast/core.hpp>
 #include <boost/beast/ssl.hpp>

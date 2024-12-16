@@ -30,6 +30,8 @@ private:
     std::string endpoint_;
     strand ws_strand_;
     std::string access_token_;
+    std::unordered_map<std::string, double> subscribed_symbols_;
+    std::mutex data_mutex;
 
 public:
     // Resolver and socket require an io_context
@@ -200,6 +202,10 @@ public:
         return access_token_;
     }
 
+    std::unordered_map<std::string, double> get_subscribed_symbols() const {
+        return subscribed_symbols_;
+    }
+
     void on_read(beast::error_code ec, std::size_t bytes_transferred){
         boost::ignore_unused(bytes_transferred);
 
@@ -211,18 +217,33 @@ public:
 
         // Print the messages
         // make_printable interprets the bytes are characters and sends to output stream
-        std::cout << "Received response from server " << "\n";
-        std::cout << beast::make_printable(buffer_.data()) << " by thread ID:" << boost::this_thread::get_id() << std::endl;
+        // do not print subscribed symbol updates.
+        // std::cout << "Received response from server " << "\n";
+        // std::cout << beast::make_printable(buffer_.data()) << " by thread ID:" << boost::this_thread::get_id() << std::endl;
 
         std::string response(boost::asio::buffer_cast<const char*>(buffer_.data()), buffer_.size());
         
         // Clear the buffer
         buffer_.consume(buffer_.size());
 
+        //parse response check type.
+        json j = json::parse(response);
+
+        if(j.contains("method") && j["method"] == "subscription"){
+            //std::cout << j["params"]["data"]["index_name"] << " " << j["params"]["data"]["price"] << "\n";
+            {
+                std::lock_guard<std::mutex> lock(data_mutex);
+                subscribed_symbols_[j["params"]["data"]["index_name"]] = j["params"]["data"]["price"];
+            }
+        }else{
+            std::cout << "Received response from server " << "\n";
+            std::cout << response << " by thread ID:" << boost::this_thread::get_id() << std::endl;
+        }
+        
+
         if(access_token_.empty()){
             try {
                 // Parse the JSON response
-                json j = json::parse(response);
 
                 // Check if the response contains "result" and "access_token"
                 if (j.contains("result") && j["result"].contains("access_token")) {
