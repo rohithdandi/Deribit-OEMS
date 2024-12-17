@@ -1,5 +1,4 @@
 #pragma once
-#include "common.h"
 #include "json.hpp"
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>

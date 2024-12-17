@@ -5,16 +5,15 @@ project(DeribitOEMS VERSION 0.0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Boost REQUIRED COMPONENTS system thread)
+find_package(Boost REQUIRED COMPONENTS system thread program_options)
 find_package(OpenSSL REQUIRED)
 
 # Add the executable
-add_executable(deribitOEMSBinary src/main.cpp)
+add_executable(deribitOEMSBinary src/main2.cpp src/utils.cpp)
 
 # Include directories
 target_include_directories(deribitOEMSBinary
     PUBLIC src
-    PUBLIC asio-1.30.2/include # Replace with the actual path to the certify/include directory
     PUBLIC Header_Files
 )
 target_link_libraries(deribitOEMSBinary

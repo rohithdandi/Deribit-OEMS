@@ -1,8 +1,9 @@
 #include <olc_net.h>
+#include <utils.h>
 
 void print_subscribed_symbols_to_file(std::shared_ptr<session> ws_session, std::atomic<bool>& show_subscriptions) {
     std::ofstream outfile("./subscribed_symbols.txt");
-    
+
     if (!outfile.is_open()) {
         std::cerr << "Error opening file to write subscribed symbols.\n";
         return;
@@ -30,6 +31,8 @@ void print_subscribed_symbols_to_file(std::shared_ptr<session> ws_session, std::
 
 int main(int ac, char* av[]) {
     std::atomic<bool> running(true);
+    po::options_description desc = configure_help_options();
+    
     std::atomic<bool> show_subscriptions(false);
     std::cout << "Welcome to the interactive CLI program! Type '--help' for options.\n";
 
@@ -44,6 +47,7 @@ int main(int ac, char* av[]) {
         ioc.stop();
         running.store(false, std::memory_order_release);
         std::cout << "Signal received, stopped the process.";
+        exit(0);
     });
 
     // The SSL context is required, and holds certificates
@@ -66,7 +70,7 @@ int main(int ac, char* av[]) {
             std::string input_line;
             std::cout << "> "; // Prompt for input
             std::getline(std::cin, input_line); // Get user input
-
+            std::cout << input_line << "\n";
             if(input_line.empty()) {
                 continue; // Skip empty input
             }
@@ -444,8 +448,7 @@ int main(int ac, char* av[]) {
             else if (input_line == "deribit --stop_showing_subscribed") {
                 show_subscriptions.store(false);
                 std::cout << "Stopped displaying subscribed symbols.\n";
-            }
-            else if (input_line == "exit"){
+            }else if (input_line == "exit"){
                 if (ws_session) {
                     ws_session->close_websocket();
                     ws_session.reset(); // Reset the session to clean up resources
