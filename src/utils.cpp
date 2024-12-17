@@ -59,8 +59,9 @@ void validate_place_order(const po::variables_map& vm) {
 }
 
 
-jsonrpc store_required_values(const po::variables_map& vm, jsonrpc j) {
-
+jsonrpc store_required_values(const po::variables_map& vm){
+    jsonrpc j;
+    
     if (vm.count("direction")) {
         j["method"] = "private/" + vm["direction"].as<std::string>();
     }

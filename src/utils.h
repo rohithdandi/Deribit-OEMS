@@ -2,7 +2,7 @@
 #define UTILS_H
 
 #include <boost/program_options.hpp>
-#include "../Header_Files/message.h"
+#include "../Header_Files/json_rpc.h"
 
 namespace po = boost::program_options;
 
@@ -12,6 +12,6 @@ po::options_description configure_help_options();
 
 void validate_place_order(const po::variables_map& vm);
 
-jsonrpc store_required_values(const po::variables_map& vm,jsonrpc j);
+jsonrpc store_required_values(const po::variables_map& vm);
 
 #endif // UTILS_H

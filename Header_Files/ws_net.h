@@ -1,4 +1,4 @@
 #pragma once
 #include "common.h"
-#include "message.h"
+#include "json_rpc.h"
 #include "websocket.h"

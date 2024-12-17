@@ -1,5 +1,5 @@
 #pragma once
-#include "message.h"
+#include "json_rpc.h"
 #include "common.h"
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
@@ -227,37 +227,18 @@ public:
         // Clear the buffer
         buffer_.consume(buffer_.size());
 
-        //parse response check type.
-        json j = json::parse(response);
+        try {
+            json j = json::parse(response);
 
-        if(j.contains("method") && j["method"] == "subscription"){
-            //std::cout << j["params"]["data"]["index_name"] << " " << j["params"]["data"]["price"] << "\n";
-            {
-                std::lock_guard<std::mutex> lock(data_mutex);
-                subscribed_symbols_[j["params"]["data"]["index_name"]] = j["params"]["data"]["price"];
+            if (j.contains("method") && j["method"] == "subscription") {
+                process_subscription(j);
+            } else if (access_token_.empty()) {
+                handle_access_token(j);
+            } else {
+                std::cout << "Received response: " << response << "\n";
             }
-        }else{
-            std::cout << "Received response from server " << "\n";
-            std::cout << response << " by thread ID:" << boost::this_thread::get_id() << std::endl;
-        }
-        
-
-        if(access_token_.empty()){
-            try {
-                // Parse the JSON response
-
-                // Check if the response contains "result" and "access_token"
-                if (j.contains("result") && j["result"].contains("access_token")) {
-                    std::string token = j["result"]["access_token"];
-                    set_access_token(token); // Store the access token
-                    std::cout << "Access Token is set\n";
-                }
-                else {
-                    std::cerr << "Error: No access token found in response." << std::endl;
-                }
-            } catch (const json::parse_error& e) {
-                std::cerr << "JSON parse error: " << e.what() << std::endl;
-            }
+        } catch (const json::parse_error& e) {
+            std::cerr << "JSON parse error: " << e.what() << "\n";
         }
 
         // Read single message
@@ -267,6 +248,24 @@ public:
             // beast::bind_front_handler(
             //     &session::on_read,
             //     shared_from_this()));
+    }
+    
+    void process_subscription(const json& j) {
+        try {
+            std::lock_guard<std::mutex> lock(data_mutex);
+            subscribed_symbols_[j["params"]["data"]["index_name"]] = j["params"]["data"]["price"];
+        } catch (const std::exception& e) {
+            std::cerr << "Error processing subscription: " << e.what() << "\n";
+        }
+    }
+
+    void handle_access_token(const json& j) {
+        if (j.contains("result") && j["result"].contains("access_token")) {
+            set_access_token(j["result"]["access_token"]);
+            std::cout << "Access token set successfully.\n";
+        } else {
+            std::cerr << "Error: No access token found in response.\n";
+        }
     }
 
     void send_message(const std::string& message) {
@@ -299,4 +298,3 @@ public:
         std::cout << beast::make_printable(buffer_.data()) << std::endl;
     }
 };
-

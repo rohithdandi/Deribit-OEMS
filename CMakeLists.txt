@@ -9,7 +9,7 @@ find_package(Boost REQUIRED COMPONENTS system thread program_options)
 find_package(OpenSSL REQUIRED)
 
 # Add the executable
-add_executable(deribitOEMSBinary src/main2.cpp src/utils.cpp)
+add_executable(deribitOEMSBinary src/main.cpp src/utils.cpp)
 
 # Include directories
 target_include_directories(deribitOEMSBinary
