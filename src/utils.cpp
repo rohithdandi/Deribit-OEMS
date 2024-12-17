@@ -4,8 +4,6 @@
 #include <string>
 #include <unordered_map>
 
-// Function declarations for command-specific validations
-
 void validate_place_order(const po::variables_map& vm) {
     if (!vm.count("direction") || (vm["direction"].as<std::string>() != "buy" && vm["direction"].as<std::string>() != "sell")) {
         throw std::invalid_argument("Invalid or missing 'direction'. Must be 'buy' or 'sell'.");
@@ -42,7 +40,7 @@ void validate_place_order(const po::variables_map& vm) {
     }
 
     if (order_type == "stop_limit" || order_type == "stop_market" || order_type == "market") {
-        if (order_type != "market" && (!vm.count("trigger_price") || vm["trigger_price"].as<double>() <= 0 || ((int)(vm["trigger_price"].as<double>() * 10) % 1 != 0))) {
+        if (order_type != "market" && (!vm.count("trigger_price") || vm["trigger_price"].as<double>() <= 0 || ((vm["trigger_price"].as<double>() * 10) -(int)(vm["trigger_price"].as<double>() * 10) != 0 ))) {
             throw std::invalid_argument("Missing or invalid 'trigger_price'. Must be a positive number with tick size 0.1.");
         }
 
@@ -64,7 +62,6 @@ void validate_place_order(const po::variables_map& vm) {
 jsonrpc store_required_values(const po::variables_map& vm, jsonrpc j) {
 
     if (vm.count("direction")) {
-        //required_values["direction"] = vm["direction"].as<std::string>();
         j["method"] = "private/" + vm["direction"].as<std::string>();
     }
     
@@ -72,40 +69,32 @@ jsonrpc store_required_values(const po::variables_map& vm, jsonrpc j) {
 
     if (vm.count("instrument_name")) {
         j["params"].push_back({"instrument_name", vm["instrument_name"].as<std::string>()});
-        //required_values["instrument_name"] = vm["instrument_name"].as<std::string>();
     }
 
     if (vm.count("type")) {
         j["params"].push_back({"type", vm["type"].as<std::string>()});
-        //required_values["type"] = vm["type"].as<std::string>();
     } else {
         j["params"].push_back({"type", "limit"});
-        //required_values["type"] = "limit"; // default value
     }
 
     if (vm.count("amount")) {
         j["params"].push_back({"amount", vm["amount"].as<double>()});
-        //required_values["amount"] = std::to_string(vm["amount"].as<double>());
     }
 
     if (vm.count("contracts")) {
         j["params"].push_back({"contracts", vm["contracts"].as<double>()});
-        //required_values["contracts"] = std::to_string(vm["contracts"].as<double>());
     }
 
     if (vm.count("price")) {
         j["params"].push_back({"price", vm["price"].as<double>()});
-        //required_values["price"] = std::to_string(vm["price"].as<double>());
     }
 
     if (vm.count("trigger_price")) {
         j["params"].push_back({"trigger_price", vm["trigger_price"].as<double>()});
-        //required_values["trigger_price"] = std::to_string(vm["trigger_price"].as<double>());
     }
 
     if (vm.count("trigger")) {
-        j["params"].push_back({"trigger", vm["trigger"].as<double>()});
-        //required_values["trigger"] = vm["trigger"].as<std::string>();
+        j["params"].push_back({"trigger", vm["trigger"].as<std::string>()});
     }
 
     return j;
@@ -151,6 +140,9 @@ po::options_description configure_help_options() {
          "Subscribe to an instrument. Required parameters:\n"
          "   --instrument_name <string>\n"
          "   --channel <string>")
+        ("unsubscribe_all", "Unsubscribe from all the instruments subscribed\n")
+        ("show_subscribed", "Show real time data for subscribed symbols\n")
+        ("stop_subscribed", "Stop real time data for subscribed symbols\n")
         ("exit", "Exit the program");
 
     return desc;
@@ -185,6 +177,7 @@ void configure_cmdline_options(po::options_description& desc) {
         ("max_show", po::value<double>(), "Max show amount")
         ("valid_until", po::value<int>(), "Valid until timestamp")
         ("trigger_offset", po::value<double>(), "Trigger offset")
-        ("unsubscribe_all", "Unsubscribe from all the channels subscribed");
+        ("unsubscribe_all", "Unsubscribe from all the channels subscribed")
+        ("show_subscribed","Shows real time data for subscribed symbols into a file")
+        ("stop_subscribed","Stops real time data for subscribed symbols");
 }
-

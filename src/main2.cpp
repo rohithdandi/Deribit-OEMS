@@ -62,9 +62,14 @@ int main(int ac, char* av[]) {
             po::store(po::command_line_parser(args).options(cmdline_options).run(), vm);
             po::notify(vm);
 
+            std::cout << args.size() << "\n";
             if(vm.count("help")) {
                 std::cout << desc << "\n";
             }else if (vm.count("connect")) {
+                if (vm.size() != 2) {
+                    std::cout << "Error: '--connect' command doesn't take any parameters.\n";
+                    continue;
+                }
                 if (ws_session) {
                     std::cout << "Already connected to Deribit. Please disconnect before reconnecting.\n";
                     continue;
@@ -96,6 +101,11 @@ int main(int ac, char* av[]) {
                 ws_session->send_message(message); // Send the message
                 std::cout << "Place order request sent.\n";
             }else if(vm.count("cancel")){
+                //--cancel --order_id ETH-SLIS-12
+                if (vm.size() != 2) {  // Ensure only 1 parameter is provided
+                    std::cout << "Error: '--cancel' command requires exactly one parameter: --order_id.\n";
+                    continue;
+                }
                 if (!ws_session || ws_session->get_access_token().empty()) {
                     std::cout << "Error: Access token not set. Please authenticate first.\n";
                     continue;
@@ -112,7 +122,12 @@ int main(int ac, char* av[]) {
                 ws_session->send_message(message);
                 std::cout << "cancel order request sent.\n";
             }else if(vm.count("get_order_book")){
-                //deribit --get_order_book --instrument_name BTC-PERPETUAL --depth 5
+                //--get_order_book --instrument_name BTC-PERPETUAL --depth 5
+                if (vm.size() != 4) {  // Ensure no additional parameters are provided
+                    std::cout << "Error: '--get_order_book' command requires exactly two parameter: --instrument_name and --depth\n";
+                    continue;
+                }
+
                 std::unordered_set <int> valid_depths = {1,5,10,20,50,100,1000,10000};
                 if (!vm.count("instrument_name") || !vm.count("depth")) {
                     throw std::invalid_argument("Missing required parameters for get_order_book: --instrument_name and --depth.");
@@ -120,11 +135,6 @@ int main(int ac, char* av[]) {
                 if(valid_depths.find(vm["depth"].as<int>()) == valid_depths.end()){
                     throw std::invalid_argument("Depth has an invalid value. valid depths are {1,5,10,20,50,100,1000,10000}");
                 }
-                if (!vm.count("trigger") || (vm["trigger"].as<std::string>() != "index_price" && 
-                                          vm["trigger"].as<std::string>() != "mark_price" && 
-                                          vm["trigger"].as<std::string>() != "last_price")) {
-                throw std::invalid_argument("Invalid or missing 'trigger'. Must be one of 'index_price', 'mark_price', or 'last_price'.");
-            }
 
                 jsonrpc j("public/get_order_book");
                 j["params"] = {
@@ -139,6 +149,11 @@ int main(int ac, char* av[]) {
             }else if(vm.count("subscribe")){
                 //deribit --subscribe --channel deribit_price_index --instrument_name btc_usd
                 // only one subscription per command
+                if (vm.size() != 4) {
+                    std::cout << "Error: '--subscribe' command requires exactly two parameter: --channel and --instrument_name\n";
+                    continue;
+                }
+
                 if (!ws_session || ws_session->get_access_token().empty()) {
                     std::cout << "Error: Access token not set. Please authenticate first.\n";
                     continue;
@@ -157,15 +172,40 @@ int main(int ac, char* av[]) {
                 ws_session->send_message(message); // Send the message
                 std::cout << "subscribe request sent.\n";
             }else if(vm.count("unsubscribe_all")){
+                if(vm.size()!=2) {
+                    std::cout << "Error: '--unsubscribe_all' command doesn't take any parameters.\n";
+                    continue;
+                }
                 if (!ws_session || ws_session->get_access_token().empty()) {
                     std::cout << "Error: Access token not set. Please authenticate first.\n";
                     continue;
                 }
+                if (vm.size() > 1) { 
+                    std::cout << "Error: '--unsubscribe_all' command doesn't take any parameters.\n";
+                    continue;
+                }
+
                 jsonrpc j("private/unsubscribe_all");
                 std::string message = j.dump();
                 ws_session->send_message(message); // Send the message
                 std::cout << "unsubscribe all request sent.\n";
-            }else if (vm.count("exit")){
+            }
+            // else if (vm.count("show_subscribed")) {
+            //     show_subscriptions.store(true);
+            //     // Launch a background thread to print the subscribed symbols to a file
+            //     std::thread subscription_thread(print_subscribed_symbols_to_file, ws_session, std::ref(show_subscriptions));
+            //     subscription_thread.detach(); // Detach the thread to run independently
+            //     std::cout << "Displaying subscribed symbols. Type 'deribit --stop_showing_subscribed' to stop.\n";
+            // }
+            // else if (vm.count("stop_subscribed")) {
+            //     show_subscriptions.store(false);
+            //     std::cout << "Stopped displaying subscribed symbols.\n";
+            // }
+            else if (vm.count("exit")){
+                if (args.size() > 1) { 
+                    std::cout << "Error: '--exit' command doesn't take any parameters.\n";
+                    continue;
+                }
                 if (ws_session) {
                     std::cout << "Closing WebSocket connection...\n";
                     ws_session->close_websocket();
