@@ -69,8 +69,6 @@ This project is a high-performance Command-Line Interface (CLI) application that
 
 ---
 
-![alt text](image.png)
-
 
 ## Features
 
@@ -181,5 +179,7 @@ Displays active subscriptions in real-time.
 
 ## Further Improvements
 
+- adding validation and support for more order types.
+- 
 
 !!!WORK IN PROGRESS!!!

@@ -1,7 +1,6 @@
 #include <ws_net.h>
 #include "utils.h"
 
-
 int main(int ac, char* av[]) {
     std::atomic<bool> running(true);
     po::options_description desc = configure_help_options();
@@ -139,7 +138,7 @@ int main(int ac, char* av[]) {
                     std::cout << "Error: Access token not set. Please authenticate first.\n";
                     continue;
                 }
-                
+
                 if (!vm.count("instrument_name") || !vm.count("channel")) {
                     throw std::invalid_argument("Missing required parameters for subscribe: --instrument_name and --channel.");
                 }

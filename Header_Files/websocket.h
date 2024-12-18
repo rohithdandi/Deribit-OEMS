@@ -218,11 +218,9 @@ public:
         // Print the messages
         // make_printable interprets the bytes are characters and sends to output stream
         // do not print subscribed symbol updates.
-        // std::cout << "Received response from server " << "\n";
-        // std::cout << beast::make_printable(buffer_.data()) << " by thread ID:" << boost::this_thread::get_id() << std::endl;
 
         std::string response(boost::asio::buffer_cast<const char*>(buffer_.data()), buffer_.size());
-        
+
         // Clear the buffer
         buffer_.consume(buffer_.size());
 
@@ -234,7 +232,8 @@ public:
             } else if (access_token_.empty()) {
                 handle_access_token(j);
             } else {
-                std::cout << "Received response: " << response << "\n";
+                std::cout << "Received response from server " << "\n";
+                std::cout << response << " by thread ID:" << boost::this_thread::get_id() << std::endl;
             }
         } catch (const json::parse_error& e) {
             std::cerr << "JSON parse error: " << e.what() << "\n";
@@ -244,11 +243,8 @@ public:
         ws_.async_read(
             buffer_,
             boost::asio::bind_executor(ws_strand_, beast::bind_front_handler( &session::on_read, shared_from_this())));
-            // beast::bind_front_handler(
-            //     &session::on_read,
-            //     shared_from_this()));
     }
-    
+
     void process_subscription(const json& j) {
         try {
             std::lock_guard<std::mutex> lock(data_mutex);
@@ -287,7 +283,7 @@ public:
                 &session::on_close, shared_from_this())));
     }
 
-    // Check how to close when a signal handler is triggered? does the websocket auto close?
+    // when a signal handler is triggered
     void on_close(beast::error_code ec){
         if(ec)
             return fail(ec, "close");
