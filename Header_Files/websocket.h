@@ -11,7 +11,6 @@ using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
 typedef boost::asio::io_context::executor_type executor_type;
 typedef boost::asio::strand<executor_type> strand;
 
-
 // Report a failure
 void fail(beast::error_code ec, char const* what){
     std::cerr << what << ": " << ec.message() << "\n";

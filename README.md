@@ -1,10 +1,44 @@
-# CLI Utility for Deribit WebSocket API
+# Order Execution and Management System for Deribit Test API
 
-This project provides a high-performance order execution and management system to trade on Deribit Test (https://test.deribit.com/) using Deribit WebSocket API. The CLI utility allows users to place orders, retrieve order books, subscribe to instruments, and more, all via simple command-line options.
+## Overview
 
+This project is a high-performance Command-Line Interface (CLI) application that facilitates order execution and management on the Deribit Test WebSocket API. Designed for efficient trading, the system employs modern C++ standards and powerful libraries to ensure robustness, scalability, and ease of use.
 
-![alt text](image.png)
+## Features
 
+-Interactive CLI: User-friendly interface with prompts and clear feedback.
+
+-WebSocket Connectivity: Real-time communication with the Deribit Test WebSocket API.
+
+-Order Management: Place, cancel, and query orders.
+
+-Subscription Management: Subscribe and unsubscribe from market data feeds.
+
+-Multi-threaded I/O: Efficient handling of I/O operations using Boost Asio.
+
+-Signal Handling: Graceful termination on receiving system signals.
+
+-Configuration: Flexible command-line options for customization.
+
+## Project Structure
+
+```sh
+.
+|-- Header_Files
+|   |-- common.h           # Shared utilities and type definitions.
+|   |-- json_rpc.h         # JSON-RPC request/response utilities.
+|   |-- websocket.h        # WebSocket session management interface.
+|   |-- ws_net.h           # Network abstractions for WebSocket communication.
+|
+|-- src
+|   |-- main.cpp           # Entry point of the application.
+|   |-- utils.h            # Helper functions and utility declarations.
+|   |-- utils.cpp          # Helper functions implementation.
+|
+|-- CMakeLists.txt         # Build configuration.
+|-- README.md              # Project documentation (this file).
+
+```
 
 ## Getting Started
 
@@ -72,5 +106,8 @@ To explore the available options, type:
   Exit the program.
 
 ---
+
+![alt text](image.png)
+
 
 !!!WORK IN PROGRESS!!!
