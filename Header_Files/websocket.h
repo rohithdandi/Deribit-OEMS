@@ -219,19 +219,19 @@ public:
         // make_printable interprets the bytes are characters and sends to output stream
         // do not print subscribed symbol updates.
 
-        std::string response(boost::asio::buffer_cast<const char*>(buffer_.data()), buffer_.size());
+        std::string response = boost::beast::buffers_to_string(buffer_.data());
 
         // Clear the buffer
         buffer_.consume(buffer_.size());
 
         try {
             json j = json::parse(response);
-
-            if (j.contains("method") && j["method"] == "subscription") {
+            auto method_it = j.find("method");
+            if (method_it != j.end() && *method_it == "subscription") {
                 process_subscription(j);
-            } else if (access_token_.empty()) {
+            }else if (access_token_.empty()) {
                 handle_access_token(j);
-            } else {
+            }else{
                 std::cout << "Received response from server " << "\n";
                 std::cout << response << " by thread ID:" << boost::this_thread::get_id() << std::endl;
             }
@@ -239,7 +239,6 @@ public:
             std::cerr << "JSON parse error: " << e.what() << "\n";
         }
 
-        // Read single message
         ws_.async_read(
             buffer_,
             boost::asio::bind_executor(ws_strand_, beast::bind_front_handler( &session::on_read, shared_from_this())));

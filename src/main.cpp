@@ -112,6 +112,7 @@ int main(int ac, char* av[]) {
                 ws_session->send_message(message);
                 std::cout << "cancel order request sent.\n";
             }else if(vm.count("get_order_book")){
+
                 std::unordered_set <int> valid_depths = {1,5,10,20,50,100,1000,10000};
                 if (!vm.count("instrument_name") || !vm.count("depth")) {
                     throw std::invalid_argument("Missing required parameters for get_order_book: --instrument_name and --depth.");
@@ -151,6 +152,8 @@ int main(int ac, char* av[]) {
                 std::cout << message << "\n\n";
                 ws_session->send_message(message); // Send the message
                 std::cout << "subscribe request sent.\n";
+
+                
             }else if(vm.count("unsubscribe_all")){
                 if (!ws_session || ws_session->get_access_token().empty()) {
                     std::cout << "Error: Access token not set. Please authenticate first.\n";

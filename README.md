@@ -4,6 +4,17 @@
 
 This project is a high-performance Command-Line Interface (CLI) application that facilitates order execution and management on the Deribit Test WebSocket API. Designed for efficient trading, the system employs modern C++ standards and powerful libraries to ensure robustness, scalability, and ease of use.
 
+![alt text](image-1.png)
+
+!!!WORK IN PROGRESS!!!
+
+## Further Improvements
+
+- adding validation and support for more order types.
+- use Terminal GUI with separate windows for CLI, responses and subscriptions.
+- Support for additional order types and more granular subscriptions.
+
+
 - To explore the available options, type:
 
 ```bash
@@ -176,10 +187,3 @@ Displays active subscriptions in real-time.
 - nlohmann::json: Convenient handling of JSON for API requests and responses.
 
 - Boost UUID: Ensures thread-safe generation of unique IDs for JSON-RPC requests.
-
-## Further Improvements
-
-- adding validation and support for more order types.
-- 
-
-!!!WORK IN PROGRESS!!!
