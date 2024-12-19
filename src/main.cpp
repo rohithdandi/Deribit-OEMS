@@ -6,7 +6,7 @@ int main(int ac, char* av[]) {
     po::options_description desc = configure_help_options();
 
     std::atomic<bool> show_subscriptions(false);
-    std::cout << "Welcome to the interactive CLI program! Type '--help' for options.\n";
+    std::cout << "Welcome to the Deribit Test CLI ! Type '--help' for options.\n";
 
     // The io_context is required for all I/O
     net::io_context ioc;
@@ -123,7 +123,6 @@ int main(int ac, char* av[]) {
                 ws_session->send_message(message);
                 std::cout << "cancel order request sent.\n";
             }else if(vm.count("get_order_book")){
-
                 std::unordered_set <int> valid_depths = {1,5,10,20,50,100,1000,10000};
                 if (!vm.count("instrument_name") || !vm.count("depth")) {
                     throw std::invalid_argument("Missing required parameters for get_order_book: --instrument_name and --depth.");
@@ -143,8 +142,8 @@ int main(int ac, char* av[]) {
                 ws_session->send_message(message); // Send the message
                 std::cout << "Placed get order book request sent.\n";
             }else if(vm.count("subscribe")){
-                //--subscribe --channel deribit_price_index --instrument_name btc_usd
-                // only one subscription per command
+                //--subscribe --channel deribit_price_index --instrument_name btc_usd --channel deribit_price_index --instrument_name eth_usd
+                // subscribe to one or more channels
 
                 if (!ws_session || ws_session->get_access_token().empty()) {
                     std::cout << "Error: Access token not set. Please authenticate first.\n";
@@ -154,17 +153,29 @@ int main(int ac, char* av[]) {
                 if (!vm.count("instrument_name") || !vm.count("channel")) {
                     throw std::invalid_argument("Missing required parameters for subscribe: --instrument_name and --channel.");
                 }
+
+                std::vector<std::string> channels = vm["channel"].as<std::vector<std::string>>();
+                std::vector<std::string> instrument_names = vm["instrument_name"].as<std::vector<std::string>>();
+
+                // Validate that the counts match
+                if (channels.size() != instrument_names.size()) {
+                    throw std::invalid_argument("The number of --channel and --instrument_name arguments must match.");
+                }
+
+                std::vector<std::string> subscription_channels;
+                for (size_t i = 0; i < channels.size(); ++i) {
+                    subscription_channels.push_back(channels[i] + "." + instrument_names[i]);
+                }
+
                 jsonrpc j("private/subscribe");
                 j["params"] = {
-                    {"channels", {vm["channel"].as<std::string>()+"."+vm["instrument_name"].as<std::string>()}},
+                    {"channels", subscription_channels}
                 };
 
                 std::string message = j.dump();
                 std::cout << message << "\n\n";
                 ws_session->send_message(message); // Send the message
                 std::cout << "subscribe request sent.\n";
-
-                
             }else if(vm.count("unsubscribe_all")){
                 if (!ws_session || ws_session->get_access_token().empty()) {
                     std::cout << "Error: Access token not set. Please authenticate first.\n";
@@ -175,19 +186,7 @@ int main(int ac, char* av[]) {
                 std::string message = j.dump();
                 ws_session->send_message(message); // Send the message
                 std::cout << "unsubscribe all request sent.\n";
-            }
-            // else if (vm.count("show_subscribed")) {
-            //     show_subscriptions.store(true);
-            //     // Launch a background thread to print the subscribed symbols to a file
-            //     std::thread subscription_thread(print_subscribed_symbols_to_file, ws_session, std::ref(show_subscriptions));
-            //     subscription_thread.detach(); // Detach the thread to run independently
-            //     std::cout << "Displaying subscribed symbols. Type 'deribit --stop_showing_subscribed' to stop.\n";
-            // }
-            // else if (vm.count("stop_subscribed")) {
-            //     show_subscriptions.store(false);
-            //     std::cout << "Stopped displaying subscribed symbols.\n";
-            // }
-            else if (vm.count("exit")){
+            }else if (vm.count("exit")){
                 if (ws_session) {
                     std::cout << "Closing WebSocket connection...\n";
                     ws_session->close_websocket();

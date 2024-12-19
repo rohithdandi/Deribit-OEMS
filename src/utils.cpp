@@ -9,8 +9,11 @@ void validate_place_order(const po::variables_map& vm) {
         throw std::invalid_argument("Invalid or missing 'direction'. Must be 'buy' or 'sell'.");
     }
 
-    if (!vm.count("instrument_name")) {
+    if (!vm.count("instrument_name") || vm["instrument_name"].as<std::vector<std::string>>().empty()) {
         throw std::invalid_argument("Missing 'instrument_name'.");
+    }
+    if(vm["instrument_name"].as<std::vector<std::string>>().size() > 1){
+        throw std::invalid_argument("Only one 'instrument_name' is allowed for the 'place' command.");
     }
 
     std::string order_type = "limit";
@@ -69,7 +72,7 @@ jsonrpc store_required_values(const po::variables_map& vm){
     j["params"] = json::object();
 
     if (vm.count("instrument_name")) {
-        j["params"].push_back({"instrument_name", vm["instrument_name"].as<std::string>()});
+        j["params"].push_back({"instrument_name", vm["instrument_name"].as<std::vector<std::string>>()[0]});
     }
 
     if (vm.count("type")) {
@@ -139,12 +142,9 @@ po::options_description configure_help_options() {
          "   --instrument_name <string>\n"
          "   --depth <1|5|10|20|50|100|1000|10000>")
         ("subscribe", 
-         "Subscribe to an instrument. Required parameters:\n"
-         "   --instrument_name <string>\n"
-         "   --channel <string>")
+         "Subscribe to one or more instruments. Required parameters:\n"
+         "   --channel <string>  --instrument_name <string>\n")
         ("unsubscribe_all", "Unsubscribe from all the instruments subscribed\n")
-        ("show_subscribed", "Show real time data for subscribed symbols\n")
-        ("stop_subscribed", "Stop real time data for subscribed symbols\n")
         ("exit", "Exit the program");
 
     return desc;
@@ -163,9 +163,9 @@ void configure_cmdline_options(po::options_description& desc) {
         ("get_order_book", "Get the order book for an instrument")
         ("subscribe", "Subscribe to a channel for an instrument")
         ("order_id", po::value<std::string>(), "Order ID (required for cancel)")
-        ("instrument_name", po::value<std::string>(), "Instrument name")
+        ("channel", po::value<std::vector<std::string>>()->multitoken(), "Channel name(s) (for subscribe)")
+        ("instrument_name", po::value<std::vector<std::string>>()->multitoken(), "Instrument name(s) (for subscribe)")
         ("depth", po::value<int>(), "Depth for order book")
-        ("channel", po::value<std::string>(), "Channel name for subscription")
         ("direction", po::value<std::string>(), "Order direction ('buy' or 'sell')")
         ("type", po::value<std::string>()->default_value("limit"), "Order type ('limit', 'stop_limit', 'market', 'stop_market')")
         ("amount", po::value<double>(), "Order amount (positive number)")
@@ -180,7 +180,5 @@ void configure_cmdline_options(po::options_description& desc) {
         ("max_show", po::value<double>(), "Max show amount")
         ("valid_until", po::value<int>(), "Valid until timestamp")
         ("trigger_offset", po::value<double>(), "Trigger offset")
-        ("unsubscribe_all", "Unsubscribe from all the channels subscribed")
-        ("show_subscribed","Shows real time data for subscribed symbols into a file")
-        ("stop_subscribed","Stops real time data for subscribed symbols");
+        ("unsubscribe_all", "Unsubscribe from all the channels subscribed");
 }
