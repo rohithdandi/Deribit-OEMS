@@ -4,11 +4,8 @@
 #include <memory>
 #include <thread>
 #include <mutex>
-#include <deque>
 #include <string>
 #include <optional>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 #include <iostream>
 #include <algorithm>
@@ -29,3 +26,17 @@
 // System Libraries
 #include <cstdlib>
 #include <cstdio>
+#include <functional>
+#include <queue>
+#include <deque>
+#include <unordered_map>
+#include <unordered_set>
+
+namespace beast = boost::beast;         // from <boost/beast.hpp>
+namespace http = beast::http;           // from <boost/beast/http.hpp>
+namespace websocket = beast::websocket; // from <boost/beast/websocket.hpp>
+namespace net = boost::asio;            // from <boost/asio.hpp>
+namespace ssl = boost::asio::ssl;       // from <boost/asio/ssl.hpp>
+using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
+typedef boost::asio::io_context::executor_type executor_type;
+typedef boost::asio::strand<executor_type> strand;

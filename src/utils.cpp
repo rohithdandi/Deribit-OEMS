@@ -107,6 +107,7 @@ po::options_description configure_help_options() {
     desc.add_options()
         ("help,h", "Produce help message")
         ("connect", "Connect to Deribit WebSocket API and authenticate.")
+        ("auth", "Authentication with the Deribit Test WebSocket API")
         ("place", 
          "Place a new order. Required parameters: \n"
          "   --direction <buy|sell>                (Required.\n"
@@ -155,6 +156,7 @@ void configure_cmdline_options(po::options_description& desc) {
     desc.add_options()
         ("help,h", "Display help message")
         ("connect", "Connect to the Deribit WebSocket API")
+        ("auth", "Performs authentication and saves tokens")
         ("exit", "Exit the program")
         ("place", "Place a new order")
         ("cancel", "Cancel an order")

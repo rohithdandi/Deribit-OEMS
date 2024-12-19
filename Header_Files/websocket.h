@@ -2,59 +2,92 @@
 #include "json_rpc.h"
 #include "common.h"
 
-namespace beast = boost::beast;         // from <boost/beast.hpp>
-namespace http = beast::http;           // from <boost/beast/http.hpp>
-namespace websocket = beast::websocket; // from <boost/beast/websocket.hpp>
-namespace net = boost::asio;            // from <boost/asio.hpp>
-namespace ssl = boost::asio::ssl;       // from <boost/asio/ssl.hpp>
-using tcp = boost::asio::ip::tcp;       // from <boost/asio/ip/tcp.hpp>
-typedef boost::asio::io_context::executor_type executor_type;
-typedef boost::asio::strand<executor_type> strand;
+template <typename T> class ThreadSafeQueue {
+public:
+    void push(T const& value) {
+        std::lock_guard<std::mutex> lock(mtx_);
+        queue_.push(value);
+        cond_var_.notify_one();
+    }
+
+    bool try_pop(T& value) {
+        std::lock_guard<std::mutex> lock(mtx_);
+        if (queue_.empty()) {
+            return false;
+        }
+        value = queue_.front();
+        queue_.pop();
+        return true;
+    }
+
+    void wait_and_pop(T& value) {
+        std::unique_lock<std::mutex> lock(mtx_);
+        cond_var_.wait(lock, [this] { return !queue_.empty(); });
+        value = queue_.front();
+        queue_.pop();
+    }
+
+private:
+    std::queue<T>           queue_;
+    mutable std::mutex      mtx_;
+    std::condition_variable cond_var_;
+};
+
+using RpcQueue = ThreadSafeQueue<json>;
+//------------------------------------------------------------------------------
 
 // Report a failure
-void fail(beast::error_code ec, char const* what){
+void
+fail(beast::error_code ec, char const* what)
+{
     std::cerr << what << ": " << ec.message() << "\n";
 }
 
 // Sends a WebSocket message and prints the response
 // enabled_shared_from_this provided function shared_from_this
 // which is a handy function to create shared pointers from this
-class session : public std::enable_shared_from_this<session> {
+class session : public std::enable_shared_from_this<session>
+{
 private:
     net::io_context& ioc_;
     tcp::resolver resolver_;
     websocket::stream<beast::ssl_stream<beast::tcp_stream>> ws_;
     beast::flat_buffer buffer_;
     std::string host_;
-    std::string text_;
     std::string endpoint_;
     strand ws_strand_;
+    RpcQueue& inbox_;
+    RpcQueue& feedQueue_;
+    std::deque<std::string> outbox_;
     std::string access_token_;
-    std::unordered_map<std::string, double> subscribed_symbols_;
-    std::mutex data_mutex;
 
 public:
     // Resolver and socket require an io_context
     explicit
-    session(net::io_context& ioc, ssl::context& ctx)
+    session(net::io_context& ioc, ssl::context& ctx, ThreadSafeQueue<json>& inbox, ThreadSafeQueue<json>& feedQueue)
         : resolver_(net::make_strand(ioc)) // Looks up the domain name
         , ws_(net::make_strand(ioc), ctx) // Websocket constructor takes an IO context and ssl context
         , ioc_(ioc) // reference to the io_context created in the main function
         , ws_strand_(ioc.get_executor()) // Get a strand from the io_context
+        , inbox_(inbox)
+        , feedQueue_(feedQueue)
     {
 
     }
 
+    std::string get_access_token() const {
+        return access_token_;
+    }
+
     // Start the asynchronous operation
-    void run(
+    void
+    run(
         char const* host,
         char const* port,
-        char const* text,
         char const* endpoint)
     {
         // Save these for later
         host_ = host;
-        text_ = text;
         endpoint_ = endpoint;
 
         std::cout << "Resolving domain name: " << host << " on port: " << port << std::endl;
@@ -68,11 +101,16 @@ public:
                 shared_from_this()));
     }
 
-    void on_resolve(beast::error_code ec, tcp::resolver::results_type results){
+    void
+    on_resolve(
+        beast::error_code ec,
+        tcp::resolver::results_type results)
+    {
         if(ec)
             return fail(ec, "resolve");
 
         std::cout << "Domain name resolved. Attempting to establish a connection..." << std::endl;
+
         // Set a timeout on the operation
         // Get lowest layer will get the underlying socket
         //websocket::stream<beast::ssl_stream<beast::tcp_stream>> ws_;
@@ -87,12 +125,11 @@ public:
             // Once Async_connect completes it calls the functor object with error_code ec and endpoint_type ep
             // which are required arguments to call on_connect function
             boost::asio::bind_executor(ws_strand_, beast::bind_front_handler( &session::on_connect, shared_from_this())));
-            // beast::bind_front_handler(
-            //     &session::on_connect,
-            //     shared_from_this()));
     }
 
-    void on_connect(beast::error_code ec, tcp::resolver::results_type::endpoint_type ep){
+    void
+    on_connect(beast::error_code ec, tcp::resolver::results_type::endpoint_type ep)
+    {
         if(ec)
             return fail(ec, "connect");
 
@@ -124,12 +161,11 @@ public:
         ws_.next_layer().async_handshake(
             ssl::stream_base::client,
             boost::asio::bind_executor(ws_strand_, beast::bind_front_handler( &session::on_ssl_handshake, shared_from_this())));
-            // beast::bind_front_handler(
-            //     &session::on_ssl_handshake,
-            //     shared_from_this()));
     }
 
-    void on_ssl_handshake(beast::error_code ec){
+    void
+    on_ssl_handshake(beast::error_code ec)
+    {
         if(ec)
             return fail(ec, "ssl_handshake");
 
@@ -155,27 +191,38 @@ public:
         // Perform the websocket handshake
         ws_.async_handshake(host_, endpoint_,
             boost::asio::bind_executor(ws_strand_, beast::bind_front_handler( &session::on_handshake, shared_from_this())));
-            // beast::bind_front_handler(
-            //     &session::on_handshake,
-            //     shared_from_this()));
     }
 
-    void on_handshake(beast::error_code ec){
+    void
+    on_handshake(beast::error_code ec)
+    {
         if(ec)
             return fail(ec, "handshake");
 
-        std::cout << "WebSocket Handshake successful. Sending authentication message..." << std::endl;
-
-        // Send the message
-        ws_.async_write(
-            net::buffer(text_),
-            boost::asio::bind_executor(ws_strand_, beast::bind_front_handler( &session::on_write, shared_from_this())));
-            // beast::bind_front_handler(
-            //     &session::on_write,
-            //     shared_from_this()));
+        std::cout << "WebSocket Handshake successful. Connected to Deribit Test..." << std::endl;
+        // do read
+        ws_.async_read(
+            buffer_,
+            boost::asio::bind_executor(ws_strand_, beast::bind_front_handler( &session::on_read, shared_from_this())));
     }
 
-    void on_write(beast::error_code ec, std::size_t bytes_transferred){
+    void send_message(std::string message){
+        net::post(ws_strand_,[this, m = std::move(message)] () mutable {
+            outbox_.push_back(std::move(m));
+            if (outbox_.size() == 1){
+                // do write
+                ws_.async_write(
+                net::buffer(outbox_.front()),
+                boost::asio::bind_executor(ws_strand_, beast::bind_front_handler( &session::on_write, shared_from_this())));
+            }
+        });
+    }
+
+    void
+    on_write(
+        beast::error_code ec,
+        std::size_t bytes_transferred)
+    {
         // Supress unused variable compiler warnings
         // bytes_transferred contains total bytes read/written to the websocket stream
         boost::ignore_unused(bytes_transferred);
@@ -183,105 +230,70 @@ public:
         if(ec)
             return fail(ec, "write");
 
-        std::cout << "Authentication message sent. Awaiting response..." << std::endl;
+        std::cout << "Sent " << bytes_transferred << " bytes" << "\n"; 
 
-        // Read single message
-        ws_.async_read(
-            buffer_,
-            boost::asio::bind_executor(ws_strand_, beast::bind_front_handler( &session::on_read, shared_from_this())));
-    }
+        outbox_.pop_front();
 
-    void set_access_token(const std::string& token) {
-        access_token_ = token;
-    }
-
-    // Function to get the access token
-    std::string get_access_token() const {
-        return access_token_;
-    }
-
-    std::unordered_map<std::string, double> get_subscribed_symbols() const {
-        return subscribed_symbols_;
-    }
-
-    void on_read(beast::error_code ec, std::size_t bytes_transferred){
-        boost::ignore_unused(bytes_transferred);
-
-        if(ec){
-            fail(ec, "read");
-            close_websocket(); // Gracefully close the connection on read error
-            return;
+        if(outbox_.empty()){
+             return;
         }
 
-        // Print the messages
-        // make_printable interprets the bytes are characters and sends to output stream
-        // do not print subscribed symbol updates.
+        ws_.async_write(
+            net::buffer(outbox_.front()),
+            boost::asio::bind_executor(ws_strand_, beast::bind_front_handler( &session::on_write, shared_from_this())));
 
-        std::string response = boost::beast::buffers_to_string(buffer_.data());
+    }
 
-        // Clear the buffer
-        buffer_.consume(buffer_.size());
+    void
+    on_read(
+        beast::error_code ec,
+        std::size_t bytes_transferred)
+    {
+        boost::ignore_unused(bytes_transferred);
+
+        if(ec)
+            return fail(ec, "read");
+
+        auto response = beast::buffers_to_string(buffer_.data()).substr(0, bytes_transferred);
+        std::cout << "Received response from server " << "\n";
+        std::cout << response << " by thread ID:" << boost::this_thread::get_id() << std::endl;
 
         try {
             json j = json::parse(response);
             auto method_it = j.find("method");
             if (method_it != j.end() && *method_it == "subscription") {
-                process_subscription(j);
+                feedQueue_.push(j);
             }else if (access_token_.empty()) {
-                handle_access_token(j);
+                if (j.contains("result") && j["result"].contains("access_token")) {
+                    access_token_ = j["result"]["access_token"];
+                    std::cout << "Access token set successfully.\n";
+                } else {
+                    std::cerr << "Error: No access token found in response, Authentication required.\n";
+                }
             }else{
-                std::cout << "Received response from server " << "\n";
-                std::cout << response << " by thread ID:" << boost::this_thread::get_id() << std::endl;
+                inbox_.push(j);
             }
         } catch (const json::parse_error& e) {
             std::cerr << "JSON parse error: " << e.what() << "\n";
         }
+        
+        // Clear the buffer
+        buffer_.consume(buffer_.size());
 
+        // on read loop
         ws_.async_read(
             buffer_,
             boost::asio::bind_executor(ws_strand_, beast::bind_front_handler( &session::on_read, shared_from_this())));
     }
 
-    void process_subscription(const json& j) {
-        try {
-            std::lock_guard<std::mutex> lock(data_mutex);
-            subscribed_symbols_[j["params"]["data"]["index_name"]] = j["params"]["data"]["price"];
-        } catch (const std::exception& e) {
-            std::cerr << "Error processing subscription: " << e.what() << "\n";
-        }
+    void close_websocket(){
+        beast::get_lowest_layer(ws_).cancel();
+        //ioc_.join();
     }
-
-    void handle_access_token(const json& j) {
-        if (j.contains("result") && j["result"].contains("access_token")) {
-            set_access_token(j["result"]["access_token"]);
-            std::cout << "Access token set successfully.\n";
-        } else {
-            std::cerr << "Error: No access token found in response.\n";
-        }
-    }
-
-    void send_message(const std::string& message) {
-    // Simply send the message asynchronously, without binding to on_write
-        ws_.async_write(
-            net::buffer(message),
-            [](beast::error_code ec, std::size_t bytes_transferred) {
-                if (ec) {
-                    std::cerr << "Error sending message: " << ec.message() << std::endl;
-                }
-                else {
-                    std::cout << "Sent message, bytes transferred: " << bytes_transferred << std::endl;
-                }
-            });
-    }
-
-    void close_websocket() {
-        ws_.async_close(websocket::close_code::normal,
-            boost::asio::bind_executor(ws_strand_, beast::bind_front_handler(
-                &session::on_close, shared_from_this())));
-    }
-
-    // when a signal handler is triggered
-    void on_close(beast::error_code ec){
+    // Check how to close when a signal handler is triggered? does the websocket auto close?
+    void
+    on_close(beast::error_code ec)
+    {
         if(ec)
             return fail(ec, "close");
 

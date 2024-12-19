@@ -13,6 +13,10 @@ int main(int ac, char* av[]) {
     const int ioc_threads = 2;
     std::vector<std::thread> ioc_thread_pool;
 
+    // to store responses from server
+    RpcQueue inbox;
+    RpcQueue feedQueue;
+
     // for signal handler to exit cleanly
     boost::asio::signal_set signals(ioc, SIGINT, SIGTERM);
     signals.async_wait([&](auto, auto){
@@ -69,19 +73,24 @@ int main(int ac, char* av[]) {
                     continue;
                 }
 
-                ws_session = std::make_shared<session>(ioc, ctx);
+                ws_session = std::make_shared<session>(ioc, ctx, inbox,feedQueue);
 
-                jsonrpc j;
-                j["method"] = "public/auth";
+                ws_session->run("test.deribit.com", "443","/ws/api/v2");
+            }else if(vm.count("auth")){
+                if (!ws_session){
+                    std::cout << "Not connected to Deribit. Please connect before authenticating.\n";
+                    continue;
+                }
+                jsonrpc j("public/auth");
                 j["params"] = {
                     {"grant_type", "client_credentials"},
                     {"client_id", "5LlATT7V"},
                     {"client_secret", "p9hjUS1ohjMnXDt9yMVa7qZiODeAf-IWn943Zs0BOFU"}
                 };
                 std::string auth_message = j.dump();
-
-                ws_session->run("test.deribit.com", "443", auth_message.c_str(), "/ws/api/v2");
-            } else if(vm.count("place")){
+                ws_session->send_message(auth_message);
+            } 
+            else if(vm.count("place")){
                 //--place direction=<> instrument_name=<> type=<> 
                 //--place --direction buy --instrument_name ETH-PERPETUAL --type limit --amount 40 --price 1500
                 //--place --direction sell --instrument_name ETH-PERPETUAL --type stop_limit --amount 10 --price 145.6 --trigger_price 145 --trigger last_price
