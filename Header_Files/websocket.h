@@ -71,7 +71,7 @@ public:
     void on_resolve(beast::error_code ec, tcp::resolver::results_type results){
         if(ec)
             return fail(ec, "resolve");
-        
+
         std::cout << "Domain name resolved. Attempting to establish a connection..." << std::endl;
         // Set a timeout on the operation
         // Get lowest layer will get the underlying socket
@@ -173,7 +173,6 @@ public:
             // beast::bind_front_handler(
             //     &session::on_write,
             //     shared_from_this()));
-
     }
 
     void on_write(beast::error_code ec, std::size_t bytes_transferred){
@@ -190,7 +189,6 @@ public:
         ws_.async_read(
             buffer_,
             boost::asio::bind_executor(ws_strand_, beast::bind_front_handler( &session::on_read, shared_from_this())));
-
     }
 
     void set_access_token(const std::string& token) {

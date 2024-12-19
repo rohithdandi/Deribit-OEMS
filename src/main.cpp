@@ -100,10 +100,12 @@ int main(int ac, char* av[]) {
                     std::cout << "Error: Access token not set. Please authenticate first.\n";
                     continue;
                 }
+
                 //by order id.
                 if (!vm.count("order_id")) {
                     throw std::invalid_argument("Missing required parameter for cancel: --order_id.");
                 }
+
                 jsonrpc j("/private/cancel");
                 j["params"] = {
                     {"order_id", vm["order_id"].as<std::string>()},
