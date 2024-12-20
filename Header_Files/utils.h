@@ -1,8 +1,10 @@
-#include "utils.h"
-#include <iostream>
-#include <stdexcept>
-#include <string>
-#include <unordered_map>
+#ifndef UTILS_H
+#define UTILS_H
+
+#include "common.h"
+#include "json_rpc.h"
+
+namespace po = boost::program_options;
 
 void validate_place_order(const po::variables_map& vm) {
     if (!vm.count("direction") || (vm["direction"].as<std::string>() != "buy" && vm["direction"].as<std::string>() != "sell")) {
@@ -186,3 +188,5 @@ void configure_cmdline_options(po::options_description& desc) {
         ("unsubscribe_all", "Unsubscribe from all the channels subscribed")
         ("unsubscribe", "UnSubscribe to one or more channels");
 }
+
+#endif // UTILS_H

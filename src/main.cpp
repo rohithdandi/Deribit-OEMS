@@ -1,5 +1,4 @@
 #include <ws_net.h>
-#include "utils.h"
 
 int main(int ac, char* av[]) {
     std::atomic<bool> running(true);

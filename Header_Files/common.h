@@ -22,6 +22,7 @@
 #include <boost/asio/signal_set.hpp>
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
+#include <boost/program_options.hpp>
 
 // System Libraries
 #include <cstdlib>
@@ -31,6 +32,7 @@
 #include <deque>
 #include <unordered_map>
 #include <unordered_set>
+#include <stdexcept>
 
 namespace beast = boost::beast;         // from <boost/beast.hpp>
 namespace http = beast::http;           // from <boost/beast/http.hpp>
