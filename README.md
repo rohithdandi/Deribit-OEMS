@@ -6,7 +6,7 @@ This project is a high-performance Command-Line Interface (CLI) application that
 
 This project implements a robust, asynchronous, thread-safe WebSocket client using Boost.Beast and Boost.Asio. The implementation ensures secure and efficient communication with the Deribit API, managing multiple operations such as authentication, message transmission, and subscription data processing concurrently. The use of strands guarantees thread safety, while thread-safe queues (inbox_ and feedQueue_) handle responses and real-time subscription data without race conditions, enabling reliable data flow across different parts of the application.
 
-![alt text](image-1.png)
+![alt text](image.png)
 
 !!!WORK IN PROGRESS!!!
 
