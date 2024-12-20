@@ -206,7 +206,7 @@ public:
             boost::asio::bind_executor(ws_strand_, beast::bind_front_handler( &session::on_read, shared_from_this())));
     }
 
-    void send_message(std::string message){
+    void send_message(std::string& message){
         net::post(ws_strand_,[this, m = std::move(message)] () mutable {
             outbox_.push_back(std::move(m));
             if (outbox_.size() == 1){
@@ -218,8 +218,7 @@ public:
         });
     }
 
-    void
-    on_write(
+    void on_write(
         beast::error_code ec,
         std::size_t bytes_transferred)
     {
@@ -244,8 +243,7 @@ public:
 
     }
 
-    void
-    on_read(
+    void on_read(
         beast::error_code ec,
         std::size_t bytes_transferred)
     {
@@ -258,6 +256,7 @@ public:
         std::cout << "Received response from server " << "\n";
         std::cout << response << " by thread ID:" << boost::this_thread::get_id() << std::endl;
 
+        // Check if parsing was successful.
         try {
             json j = json::parse(response);
             auto method_it = j.find("method");

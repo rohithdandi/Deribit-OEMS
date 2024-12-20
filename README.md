@@ -22,13 +22,14 @@ This project implements a robust, asynchronous, thread-safe WebSocket client usi
 - adding validation and support for more order types.
 
 
-- To explore the available options, type:
+## Getting Started
+To explore the available options, type:
 
 ```bash
 \Deribit > $--help
 ```
 
-## Available Commands
+### Available Commands
 
 ### General Commands
 1. Help
@@ -156,11 +157,10 @@ This project implements a robust, asynchronous, thread-safe WebSocket client usi
 |   |-- json_rpc.h         # JSON-RPC message utilities.
 |   |-- websocket.h        # WebSocket session management.
 |   |-- ws_net.h           
+|   |-- utils.h            
 |
 |-- src
 |   |-- main.cpp           # Entry point of the application.
-|   |-- utils.h            # Helper functions declarations.
-|   |-- utils.cpp          # Helper functions implementation.
 |
 |-- CMakeLists.txt         # Build configuration.
 |-- README.md              

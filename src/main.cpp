@@ -58,15 +58,24 @@ int main(int ac, char* av[]) {
             }
 
             std::vector<std::string> args = po::split_unix(input_line);
-            args.insert(args.begin(), "program"); // Fake program name for parsing
 
             po::variables_map vm;
             po::store(po::command_line_parser(args).options(cmdline_options).run(), vm);
             po::notify(vm);
 
+            std::cout << args.size() << "\n";
+            std::cout << vm.size() << "\n";
             if(vm.count("help")) {
+                if(args.size()>1){
+                    std::cout << "Usage: --help" <<"\n";
+                    continue;
+                }
                 std::cout << desc << "\n";
             }else if (vm.count("connect")) {
+                if(args.size()>1){
+                    std::cout << "Usage: --connect" <<"\n";
+                    continue;
+                }
                 if (ws_session) {
                     std::cout << "Already connected to Deribit. Please disconnect before reconnecting.\n";
                     continue;
@@ -76,6 +85,10 @@ int main(int ac, char* av[]) {
 
                 ws_session->run("test.deribit.com", "443","/ws/api/v2");
             }else if(vm.count("auth")){
+                if(args.size()>1){
+                    std::cout << "Usage: --auth" <<"\n";
+                    continue;
+                }
                 if (!ws_session){
                     std::cout << "Not connected to Deribit. Please connect before authenticating.\n";
                     continue;
@@ -104,6 +117,10 @@ int main(int ac, char* av[]) {
                 std::cout << "Place order request sent.\n";
             }else if(vm.count("cancel")){
                 //--cancel --order_id ETH-SLIS-12
+                if(args.size()>3){
+                    std::cout << "Usage: --cancel [options]\n\nOptions:\n  --order_id <string>" <<"\n";
+                    continue;
+                }
                 if (!ws_session || ws_session->get_access_token().empty()) {
                     std::cout << "Error: Access token not set. Please authenticate first.\n";
                     continue;
@@ -122,8 +139,16 @@ int main(int ac, char* av[]) {
                 ws_session->send_message(message);
                 std::cout << "cancel order request sent.\n";
             }else if(vm.count("get_order_book")){
+                //--get_order_book --instrument_name BTC-PERPETUAL --depth 5
+                if(args.size()>5){
+                    std::cout << "Usage: --get_order_book [options]\n\nOptions:\n  --instrument_name <string>\n  --depth <int>" <<"\n";
+                    continue;
+                }
                 std::unordered_set <int> valid_depths = {1,5,10,20,50,100,1000,10000};
-                if (!vm.count("instrument_name") || !vm.count("depth")) {
+                if(vm["instrument_name"].as<std::vector<std::string>>().size() > 1){
+                    throw std::invalid_argument("Only one 'instrument_name' is allowed for the 'place' command.");
+                }
+                if (!vm.count("instrument_name") || vm["instrument_name"].as<std::vector<std::string>>().empty() || !vm.count("depth")) {
                     throw std::invalid_argument("Missing required parameters for get_order_book: --instrument_name and --depth.");
                 }
                 if(valid_depths.find(vm["depth"].as<int>()) == valid_depths.end()){
@@ -132,7 +157,7 @@ int main(int ac, char* av[]) {
 
                 jsonrpc j("public/get_order_book");
                 j["params"] = {
-                    {"instrument_name", vm["instrument_name"].as<std::string>()},
+                    {"instrument_name", vm["instrument_name"].as<std::vector<std::string>>()[0]},
                     {"depth", vm["depth"].as<int>()},
                 };
 
@@ -178,7 +203,6 @@ int main(int ac, char* av[]) {
             }else if(vm.count("unsubscribe")){
                 //--unsubscribe --channel deribit_price_index --instrument_name btc_usd --channel deribit_price_index --instrument_name eth_usd
                 // unsubscribe to one or more channels
-
                 if (!ws_session || ws_session->get_access_token().empty()) {
                     std::cout << "Error: Access token not set. Please authenticate first.\n";
                     continue;
@@ -211,6 +235,11 @@ int main(int ac, char* av[]) {
                 ws_session->send_message(message); // Send the message
                 std::cout << "unsubscribe request sent.\n";
             }else if(vm.count("unsubscribe_all")){
+                // --unsubscribe_all
+                if(args.size()>1){
+                    std::cout << "Usage: --unsubscribe_all" <<"\n";
+                    continue;
+                }
                 if (!ws_session || ws_session->get_access_token().empty()) {
                     std::cout << "Error: Access token not set. Please authenticate first.\n";
                     continue;
@@ -221,6 +250,10 @@ int main(int ac, char* av[]) {
                 ws_session->send_message(message); // Send the message
                 std::cout << "unsubscribe all request sent.\n";
             }else if (vm.count("exit")){
+                if(args.size()>1){
+                    std::cout << "Usage: --exit" <<"\n";
+                    continue;
+                }
                 if (ws_session) {
                     std::cout << "Closing WebSocket connection...\n";
                     ws_session->close_websocket();
