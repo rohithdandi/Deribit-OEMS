@@ -4,15 +4,22 @@
 
 This project is a high-performance Command-Line Interface (CLI) application that facilitates order execution and management on the Deribit Test WebSocket API. Designed for efficient trading, the system employs modern C++ standards and powerful libraries to ensure robustness, scalability, and ease of use.
 
+This project implements a robust, asynchronous, thread-safe WebSocket client using Boost.Beast and Boost.Asio. The implementation ensures secure and efficient communication with the Deribit API, managing multiple operations such as authentication, message transmission, and subscription data processing concurrently. The use of strands guarantees thread safety, while thread-safe queues (inbox_ and feedQueue_) handle responses and real-time subscription data without race conditions, enabling reliable data flow across different parts of the application.
+
 ![alt text](image-1.png)
 
 !!!WORK IN PROGRESS!!!
 
 ## Further Improvements
 
+- Enhanced User Interface (UI)
+  Utilizing the thread-safe inbox_ for responses and feedQueue_ for subscription data, real-time information can be displayed in a single screen with multiple dynamic windows. This enhancement will provide users with:
+
+ - Real-time Order Book View: Instant updates on market orders.
+ - Trade Execution Feedback: Clear, interactive feedback for submitted trades.
+ - Subscriptions Dashboard: A centralized window for all active subscriptions
+
 - adding validation and support for more order types.
-- use Terminal GUI with separate windows for CLI, responses and subscriptions.
-- Support for additional order types and more granular subscriptions.
 
 
 - To explore the available options, type:
@@ -24,15 +31,28 @@ This project is a high-performance Command-Line Interface (CLI) application that
 ## Available Commands
 
 ### General Commands
-- **`--help`**  
+1. Help
   Produce help message.
+```bash
+--help
+```
 
-- **`--connect`**  
+2. Connect
   Connect to the Deribit WebSocket API and authenticate.
+```bash
+--connect
+```
 
 ### Order Management
-- **`--place`**  
-  Place a new order. Required parameters:
+3. Auth
+  Authenticate with the Deribit Test WebSocket API.
+```bash
+--auth
+```
+
+4. Place
+  Place a new order. Below are the required and optional parameters.
+
   - **`--direction <buy|sell>`** *(Required)*
   - **`--instrument_name <string>`** *(Required)*
   - **`--type <limit|stop_limit|market|stop_market>`** *(Optional)* Default: `limit`.
@@ -50,50 +70,82 @@ This project is a high-performance Command-Line Interface (CLI) application that
   - **`--valid_until <int>`**
   - **`--trigger_offset <positive double>`**
 
-- **`--cancel`**  
+```bash
+--place --direction <buy|sell> --instrument_name <string> --amount <positive double> --price <positive double> --trigger_price <positive double>
+```
+
+5. Cancel
   Cancel an order. Required parameters:
   - **`--order_id <string>`**
+```bash
+--cancel --order_id <string>
+```
 
 ### Market Data Commands
-- **`--get_order_book`**  
-  Get the order book for an instrument. Required parameters:
+
+6. Get_order_book
+  Get the order book for a specific instrument. Below are the required parameters.
+  Required parameters:
   - **`--instrument_name <string>`**
   - **`--depth <1|5|10|20|50|100|1000|10000>`**
+```bash
+--get_order_book --instrument_name <string> --depth <1|5|10|20|50|100|1000|10000>
+```
 
-- **`--subscribe`**  
-  Subscribe to an instrument. Required parameters:
+7. Subscribe
+  Subscribe to one or more channels and instruments. Below are the required parameters.
+  Required parameters:
   - **`--instrument_name <string>`**
-  - **`--channel <string>`**
+  - **`--channel <string>`**(pairs)
+```bash
+--subscribe --channel <string> --instrument_name <string>
+```
 
-- **`--unsubscribe_all`**  
-  Unsubscribe from all the instruments currently subscribed.
+8. Unsubscribe
+  Required parameters:
+    - **`--channel <string>`**
+    - **`--instrument_name <string>`**(pairs)
+```bash
+--unsubscribe --channel <string> --instrument_name <string>
+```
 
-- **`--show_subscribed`**  
-  Display real-time data for subscribed symbols.
-
-- **`--stop_subscribed`**  
-  Stop displaying real-time data for subscribed symbols.
+9. Unsubscribe_all
+  Unsubscribe from all the channels and instruments currently subscribed to.
+```bash
+--unsubscribe_all
+```
 
 ### Program Control
-- **`--exit`**  
+
+10. Exit
   Exit the program.
+```bash
+--exit
+```
+
+## Example Usage
+```bash
+./websocket_tool --connect
+./websocket_tool --place --direction buy --instrument_name BTC-USD --amount 1 --price 40000 --trigger_price 41000
+./websocket_tool --get_order_book --instrument_name BTC-USD --depth 10
+./websocket_tool --subscribe --channel ticker --instrument_name BTC-USD
+./websocket_tool --unsubscribe --channel ticker --instrument_name BTC-USD
+```
 
 ---
 
 
 ## Features
 
-- WebSocket Connectivity: Real-time communication with the Deribit Test WebSocket API.
+- WebSocket Connectivity: Connect to Deribit WebSocket API and  authenticate.
 
-- Order Management: Place, cancel, and query orders.
+- Order Management: Place, modify, and cancel orders with comprehensive parameter support.
 
-- Subscription Management: Subscribe and unsubscribe from market data feeds.
+- Market Data Retrieval: Fetch order books and subscribe to live updates.
+
+- Subscriptions Management: Subscribe/unsubscribe to/from channels dynamically.
 
 - Multi-threaded I/O: Efficient handling of I/O operations using Boost Asio.
-
-- Signal Handling: Graceful termination on receiving system signals.
-
-- Configuration: Flexible command-line options for customization.
 
 ## Project Structure
 
@@ -115,75 +167,12 @@ This project is a high-performance Command-Line Interface (CLI) application that
 
 ```
 
-## Implementation Details
-
-## Architecture
-
-1.Core Components:
-
-- WebSocket Session:
-Manages the lifecycle of a WebSocket connection, including connection, authentication, message sending, and reception.
-
-- JSON-RPC Utilities:
-Encodes and decodes messages to and from the JSON-RPC format required by Deribit API.
-
-- CLI Command Parser:
-Parses user input to execute corresponding actions.
-
-2.Concurrency:
-
-- Utilizes Boost Asio’s io_context to handle asynchronous I/O operations.
-
-- Multi-threaded design ensures non-blocking communication.
-
-3.Signal Handling:
-
-- Gracefully shuts down the application when receiving SIGINT or SIGTERM signals.
-
-4.Helper Utilities:
-
-utils.h and utils.cpp:
-
-Command-line Options: Functions like configure_cmdline_options and configure_help_options define and manage CLI options using Boost Program Options.
-
-Input Validation: The validate_place_order function ensures user inputs like order parameters are correctly formatted.
-
-Storing Values: The store_required_values function encapsulates validated inputs into a JSON-RPC request format for seamless integration with the WebSocket layer.
-
-5.Header Modules:
-
-common.h: Consolidates frequently used standard and Boost libraries for consistency across all modules. Simplifies maintainability and ensures thread-safety for concurrent operations.
-
-json_rpc.h: Provides a clean and thread-safe implementation of JSON-RPC requests, leveraging Boost UUID for unique IDs in a multi-threaded environment.
-
-websocket.h: Implements the session class for WebSocket connections, handling lifecycle events like on_resolve, on_connect, and on_read. Uses Boost strands and mutexes to ensure thread safety during message processing.
-
-## Commands and Functionality
-
-- **--connect**
-Establishes a WebSocket connection with Deribit Test API and authenticates using client credentials.
-
-- **--place**
-Places an order with options like direction, instrument name, type, amount, price, etc. Validates inputs using utils.h functions before processing.
-
-- **--cancel**
-Cancels an order by order ID. Ensures only valid formats are processed.
-
-- **--get_order_book**
-Fetches the order book for a specified instrument and depth.
-
-- **--subscribe / --unsubscribe_all**
-Manages subscriptions to market data channels.
-
-- **--show_subscribed / --stop_subscribed**
-Displays active subscriptions in real-time.
-
 ## Key Libraries
 
-- Boost Asio: Asynchronous I/O for WebSocket and signal handling.
+- Boost.Beast: A C++ library for handling HTTP and WebSocket communication, enabling efficient WebSocket connections and data transfer.
 
-- Boost Program Options: Parsing and validating command-line arguments.
+- Boost.Asio: An asynchronous I/O library that handles non-blocking network operations, providing scalability and improved performance.
 
-- nlohmann::json: Convenient handling of JSON for API requests and responses.
+- OpenSSL: A toolkit for SSL/TLS encryption, used to secure WebSocket connections and protect data during transmission.
 
-- Boost UUID: Ensures thread-safe generation of unique IDs for JSON-RPC requests.
+- nlohmann/json: A lightweight C++ library for parsing and generating JSON, simplifying the handling of JSON data in API interactions.

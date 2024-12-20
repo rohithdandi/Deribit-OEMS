@@ -144,6 +144,9 @@ po::options_description configure_help_options() {
         ("subscribe", 
          "Subscribe to one or more instruments. Required parameters:\n"
          "   --channel <string>  --instrument_name <string>\n")
+         ("unsubscribe", 
+         "Unsubscribe to one or more instruments. Required parameters:\n"
+         "   --channel <string>  --instrument_name <string>\n")
         ("unsubscribe_all", "Unsubscribe from all the instruments subscribed\n")
         ("exit", "Exit the program");
 
@@ -161,7 +164,7 @@ void configure_cmdline_options(po::options_description& desc) {
         ("place", "Place a new order")
         ("cancel", "Cancel an order")
         ("get_order_book", "Get the order book for an instrument")
-        ("subscribe", "Subscribe to a channel for an instrument")
+        ("subscribe", "Subscribe to one or more channels")
         ("order_id", po::value<std::string>(), "Order ID (required for cancel)")
         ("channel", po::value<std::vector<std::string>>()->multitoken(), "Channel name(s) (for subscribe)")
         ("instrument_name", po::value<std::vector<std::string>>()->multitoken(), "Instrument name(s) (for subscribe)")
@@ -180,5 +183,6 @@ void configure_cmdline_options(po::options_description& desc) {
         ("max_show", po::value<double>(), "Max show amount")
         ("valid_until", po::value<int>(), "Valid until timestamp")
         ("trigger_offset", po::value<double>(), "Trigger offset")
-        ("unsubscribe_all", "Unsubscribe from all the channels subscribed");
+        ("unsubscribe_all", "Unsubscribe from all the channels subscribed")
+        ("unsubscribe", "UnSubscribe to one or more channels");
 }

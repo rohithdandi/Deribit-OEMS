@@ -176,6 +176,41 @@ int main(int ac, char* av[]) {
                 std::cout << message << "\n\n";
                 ws_session->send_message(message); // Send the message
                 std::cout << "subscribe request sent.\n";
+            }else if(vm.count("unsubscribe")){
+                //--unsubscribe --channel deribit_price_index --instrument_name btc_usd --channel deribit_price_index --instrument_name eth_usd
+                // unsubscribe to one or more channels
+
+                if (!ws_session || ws_session->get_access_token().empty()) {
+                    std::cout << "Error: Access token not set. Please authenticate first.\n";
+                    continue;
+                }
+
+                if (!vm.count("instrument_name") || !vm.count("channel")) {
+                    throw std::invalid_argument("Missing required parameters for subscribe: --instrument_name and --channel.");
+                }
+
+                std::vector<std::string> channels = vm["channel"].as<std::vector<std::string>>();
+                std::vector<std::string> instrument_names = vm["instrument_name"].as<std::vector<std::string>>();
+
+                // Validate that the counts match
+                if (channels.size() != instrument_names.size()) {
+                    throw std::invalid_argument("The number of --channel and --instrument_name arguments must match.");
+                }
+
+                std::vector<std::string> unsubscription_channels;
+                for (size_t i = 0; i < channels.size(); ++i) {
+                    unsubscription_channels.push_back(channels[i] + "." + instrument_names[i]);
+                }
+
+                jsonrpc j("private/unsubscribe");
+                j["params"] = {
+                    {"channels", unsubscription_channels}
+                };
+
+                std::string message = j.dump();
+                std::cout << message << "\n\n";
+                ws_session->send_message(message); // Send the message
+                std::cout << "unsubscribe request sent.\n";
             }else if(vm.count("unsubscribe_all")){
                 if (!ws_session || ws_session->get_access_token().empty()) {
                     std::cout << "Error: Access token not set. Please authenticate first.\n";
