@@ -21,6 +21,8 @@ This project implements a robust, asynchronous, thread-safe WebSocket client usi
 
 2. adding validation and support for more order types.
 
+3. 
+
 ## Getting Started
 
 ### Available Commands

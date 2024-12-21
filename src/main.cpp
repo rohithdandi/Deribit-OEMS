@@ -16,14 +16,6 @@ int main(int ac, char* av[]) {
     RpcQueue inbox;
     RpcQueue feedQueue;
 
-    // for signal handler to exit cleanly
-    boost::asio::signal_set signals(ioc, SIGINT, SIGTERM);
-    signals.async_wait([&](auto, auto){
-        ioc.stop(); //stop async operations gracefully
-        running.store(false, std::memory_order_release);
-        std::cout << "Signal received, stopped the process.";
-    });
-
     // The SSL context is required, and holds certificates
     ssl::context ctx{ssl::context::tlsv12_client};
     // This holds the root certificate used for verification
@@ -31,6 +23,19 @@ int main(int ac, char* av[]) {
 
     // Shared pointer to manage WebSocket session
     std::shared_ptr<session> ws_session;
+
+    // for signal handler to exit cleanly
+    boost::asio::signal_set signals(ioc, SIGINT, SIGTERM);
+    signals.async_wait([&](const boost::system::error_code& ec, int signal_number){
+        std::cout << "signal " << ::strsignal(signal_number) << " (" << ec.message() << ")" << "\n";
+        if (ws_session) {
+            std::cout << "Closing WebSocket connection...\n";
+            ws_session->close_websocket();
+        }
+        ioc.stop(); //stop async operations gracefully
+        running.store(false, std::memory_order_release);
+        std::cout << "stopped the process";
+    });
 
     // Start the io_context in multiple threads
     for (int i = 0; i < ioc_threads; ++i) {
@@ -49,7 +54,6 @@ int main(int ac, char* av[]) {
             if (!std::getline(std::cin, input_line)) {  // Check for EOF or errors
                 std::cerr << "\nInput stream closed. Exiting command loop...\n";
                 running = false;
-                ioc.stop();
                 break;
             }
 
