@@ -19,7 +19,7 @@ int main(int ac, char* av[]) {
     // for signal handler to exit cleanly
     boost::asio::signal_set signals(ioc, SIGINT, SIGTERM);
     signals.async_wait([&](auto, auto){
-        ioc.stop();
+        ioc.stop(); //stop async operations gracefully
         running.store(false, std::memory_order_release);
         std::cout << "Signal received, stopped the process.";
     });
@@ -63,8 +63,6 @@ int main(int ac, char* av[]) {
             po::store(po::command_line_parser(args).options(cmdline_options).run(), vm);
             po::notify(vm);
 
-            std::cout << args.size() << "\n";
-            std::cout << vm.size() << "\n";
             if(vm.count("help")) {
                 if(args.size()>1){
                     std::cout << "Usage: --help" <<"\n";

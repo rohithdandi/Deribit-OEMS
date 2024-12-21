@@ -286,12 +286,11 @@ public:
     }
 
     void close_websocket(){
-        beast::get_lowest_layer(ws_).cancel();
-        //ioc_.join();
+        ws_.async_close(websocket::close_code::normal,
+            boost::asio::bind_executor(ws_strand_, beast::bind_front_handler(
+                &session::on_close, shared_from_this())));
     }
-    // Check how to close when a signal handler is triggered? does the websocket auto close?
-    void
-    on_close(beast::error_code ec)
+    void on_close(beast::error_code ec)
     {
         if(ec)
             return fail(ec, "close");
