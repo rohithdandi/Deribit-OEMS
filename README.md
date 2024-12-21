@@ -13,15 +13,18 @@ This project implements a robust, asynchronous, thread-safe WebSocket client usi
 ## Further Improvements
 
 1. Enhanced User Interface (UI)
-  - Utilizing the thread-safe inbox_ for responses and feedQueue_ for subscription data, real-time information can be displayed in a single screen with multiple dynamic windows. This enhancement will provide users with:
-
+  Utilizing the thread-safe inbox_ for responses and feedQueue_ for subscription data, real-time information can be displayed in a single screen with multiple dynamic windows. This enhancement will provide users with:
  - Real-time Order Book View: Instant updates on market orders.
  - Trade Execution Feedback: Clear, interactive feedback for submitted trades.
  - Subscriptions Dashboard: A centralized window for all active subscriptions
 
 2. adding validation and support for more order types.
 
-3. 
+3. Latency Benchmarking 
+  - Order placement latency 
+  - Market data processing latency 
+  - WebSocket message propagation delay 
+  - End-to-end trading loop latency 
 
 ## Getting Started
 
